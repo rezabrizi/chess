@@ -21,10 +21,11 @@ protected:
   PieceType type;
   bool player; // true for white, false for black
   int x, y;
+  bool alive;
 
 public:
   Piece(const string& id, PieceType type, bool player, int x, int y)
-    : id(id), type(type), player(player), x(x), y(y) {}
+    : id(id), type(type), player(player), x(x), y(y), alive(true) {}
 
   virtual vector<vector<int>> getValidMoves(const vector<vector<string>>& board, const unordered_map<string, unique_ptr<Piece>>& pMap) = 0;
 
@@ -295,6 +296,26 @@ public:
     initializeBoard();
   }
 
+  int move (){
+    // Check if in check
+    bool check = is_in_check(board, pMap);
+
+
+    if (check){
+      auto possible_moves = is_mate(board, pMap);
+      if (possible_moves.size() == 0)
+        return (player) ? 1:0;
+      else {
+        
+      }
+    }
+
+
+
+    
+
+  }
+
 private:
   vector<vector<string>> board;  // Board state with piece identifiers
   unordered_map<string, unique_ptr<Piece>> pMap;  // Map of piece identifiers to pieces
@@ -322,7 +343,7 @@ private:
     pMap["WR2"] = make_unique<Rook>("WR2", PieceType::ROOK, true, 0, 7);
     board[0][7] = "WR2";
 
-    pMap["BR1"] = make_unique<Rook>("BR1", PieceType::ROOK, false, 7, 0);
+    pMapp["BR1"] = make_unique<Rook>("BR1", PieceType::ROOK, false, 7, 0);
     board[7][0] = "BR1";
     pMap["BR2"] = make_unique<Rook>("BR2", PieceType::ROOK, false, 7, 7);
     board[7][7] = "BR2";
@@ -362,16 +383,26 @@ private:
     board[7][4] = "BK";
   }
 
-  bool is_in_check() {
+  bool is_in_check(const vector<vector<string>>& board, const unordered_map<string, unique_ptr<Piece>>& pMap) {
     // Check detection logic
     // Placeholder: Implement logic to check if the current player's king is in check
     return false;
   }
 
-  bool is_mate() {
+  unordered_map<string, vector<vector<int>>> is_mate(const vector<vector<string>>& board, const unordered_map<string, unique_ptr<Piece>>& pMap) {
     // Checkmate detection logic
     // Placeholder: Implement logic to check if the current player is in checkmate
     return false;
+  }
+
+  id take_user_input(){
+    string id = cin >> "What piece would you like to move? " << endl;
+    if (pMap.find(id) == pMap.end() || pMap.at(id)->alive == false){
+      cout << "Invalid move" << endl;
+    } else {
+      // NEED TO GET THE valid moves and get the user input 
+      return id;
+    }
   }
 };
 
