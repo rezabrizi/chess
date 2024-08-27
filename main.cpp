@@ -1,6 +1,7 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <iostream>
 #include <unordered_map>
 
 using namespace std;
@@ -308,25 +309,32 @@ public:
   int move (){
     // Check if in check
     bool check = is_in_check(board, pMap);
-
-
     if (check){
-      auto possible_moves = is_mate(board, pMap);
-      if (possible_moves.size() == 0)
-        // if true then black won if false then white won
-        return (player) ? -1:1;
-      else {
-        string id = take_user_input_id_if_in_check(possible_moves);
-        int move_id = take_user_move_input(id, possible_moves[id]);
-        vector<int> curr_pos = pMap[id]->getPosition();
-        pMap[id]->setPosition(possible_moves[id][move_id]);
-        vector<int> new_pos = pMap[id]->getPosition();
-        board[curr_pos[0]][curr_pos[1]] = "";
-        board[new_pos[0]][curr_pod[1]] = id;
-      }
-    }else {
-      
+      cout << "You are in check!!!" << endl;
     }
+
+    unordered_map<string, vector<vector<int>>> possible_moves = is_mate(board, pMap);
+    if (check && possible_moves.size() == 0){
+      return (turn) ? -1 : 1;
+    }
+
+    pair<string, vector<int>> user_move = get_user_input();
+    string piece_id = user_move.first;
+
+    vector<int> curr_position = pMap[piece_id]->getPosition();
+    pMap[piece_id]->setPosition(user_move.second);
+
+    int x = curr_position[0];
+    int y = curr_position[1];
+
+    int nx = user_move.second[0];
+    int ny = user_move.second[1];
+
+    board[x][y] = "";
+    board[nx][ny] = piece_id;
+
+    turn = !turn;
+    return 0;
   }
 
 private:
@@ -356,7 +364,7 @@ private:
     pMap["WR2"] = make_unique<Rook>("WR2", PieceType::ROOK, true, 0, 7);
     board[0][7] = "WR2";
 
-    pMapp["BR1"] = make_unique<Rook>("BR1", PieceType::ROOK, false, 7, 0);
+    pMap["BR1"] = make_unique<Rook>("BR1", PieceType::ROOK, false, 7, 0);
     board[7][0] = "BR1";
     pMap["BR2"] = make_unique<Rook>("BR2", PieceType::ROOK, false, 7, 7);
     board[7][7] = "BR2";
@@ -397,8 +405,21 @@ private:
   }
 
   bool is_in_check(const vector<vector<string>>& board, const unordered_map<string, unique_ptr<Piece>>& pMap) {
-    // Check detection logic
-    // Placeholder: Implement logic to check if the current player's king is in check
+    string curr_king_id = (turn) ? "WK" : "BK";
+    vector<int> curr_king_position = pMap.at(curr_king_id)->getPosition();
+
+    for (const auto& pPiece: pMap){
+      const unique_ptr<Piece>& curr_piece = pPiece.second;
+      if (curr_piece->getPlayer() == turn || !curr_piece->isAlive()){
+        continue;
+      }
+      vector<vector<int>> moves = curr_piece->getValidMoves(board, pMap);
+      for (const auto& move: moves){
+        if (move[0] == curr_king_position[0] && move[1] == curr_king_position[1]){
+          return true;
+        }
+      }
+    }
     return false;
   }
 
@@ -409,57 +430,15 @@ private:
     return possible_moves;
   }
 
-  string take_user_input_id_if_in_check(const unordered_map<string, vector<vector<int>>>& possible_moves){
-    string id;
-    while (true){
-      cout << "What piece would you like to move? " << endl;
-      cin >> id;
-      if (possible_moves.find(id) == possible_moves.end()){
-        cout << "Invalid move" << endl;
-      } else {
-        break;
-      }
-    }
-    return id;
-  }
-
-  int take_user_move_input(const string& id, const vector<vector<int>>& moves){
-    cout << "Possbile moves for piece " << id << " :" << endl;
-    for (int i = 0; i < moves.size(); i++){
-      cout << i+1 << " : <" << moves[i][0] << ", " << moves[i][1] << ">" << endl;
-    }
-
-
-    string move;
-    cin >> move;
-    return stoi(move)-1;
-  }
-
-  string take_user_id (){
-    string id;
-    vector<int> move(2);
-    while (true){
-      if (pMap.find(id) == pMap.end() || !pMap.at(id)->isAlive()){
-        cout << "invalid piece id." << endl;
-      }else {
-        vector<vector<int>> validMoves = pMap.at(id)->getValidMoves(board, pMap);
-        if (validMoves.size() == 0){
-          cout << "No valid moves for piece with id: " << id << endl;
-        }else {
-          for (int i = 0; i < validMoves.size(); i++){
-            cout << i + 1 << ": <" << validMoves[i][0] << "," << validMoves[i][1] << ">" << endl; 
-          }
-          string move_in;
-          cin >> move_in;
-          move[0] = validMoves[stoi(move_in)][0];
-          move[1] = validMoves[stoi(move_in)][1];
-        }
-      }
-    }
-    pair<string, vector<int>> user_move = {id, move};
+  pair<string, vector<int>> get_user_input(){
+    pair<string, vector<int>> user_move;
     return user_move;
   }
+
+
+
 };
+
 
 int main() {
   Chess game;
