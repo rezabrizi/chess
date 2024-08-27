@@ -1,8 +1,9 @@
 #include <vector>
 #include <string>
-#include <memory>
+#include <stack>
 #include <iostream>
 #include <unordered_map>
+#include <exception>
 
 using namespace std;
 
@@ -47,6 +48,9 @@ public:
     return alive;
   }
 
+  string getId(){
+    return id; 
+  }
 
 
   virtual ~Piece() = default;
@@ -307,31 +311,22 @@ public:
   }
 
   int move (){
-    // Check if in check
+    // Check if in check with each state of the board
     bool check = is_in_check(board, pMap);
     if (check){
       cout << "You are in check!!!" << endl;
     }
-
-    unordered_map<string, vector<vector<int>>> possible_moves = is_mate(board, pMap);
-    if (check && possible_moves.size() == 0){
-      return (turn) ? -1 : 1;
+    if (check){
+      unordered_map<string, vector<vector<int>>> possible_moves = is_mate(board, pMap);
+      if (check && possible_moves.size() == 0){
+        return (turn) ? -1 : 1;
+      }
     }
-
     pair<string, vector<int>> user_move = get_user_input();
     string piece_id = user_move.first;
-
-    vector<int> curr_position = pMap[piece_id]->getPosition();
-    pMap[piece_id]->setPosition(user_move.second);
-
-    int x = curr_position[0];
-    int y = curr_position[1];
-
     int nx = user_move.second[0];
     int ny = user_move.second[1];
-
-    board[x][y] = "";
-    board[nx][ny] = piece_id;
+    do_move(piece_id, nx, ny);
 
     turn = !turn;
     return 0;
@@ -340,6 +335,7 @@ public:
 private:
   vector<vector<string>> board;  // Board state with piece identifiers
   unordered_map<string, unique_ptr<Piece>> pMap;  // Map of piece identifiers to pieces
+  stack<pair<string, vector<int>>> moveHistory;
   bool turn;  // Current turn: true for white, false for black
 
   string turnToStr() {
@@ -404,17 +400,15 @@ private:
     board[7][4] = "BK";
   }
 
-  bool is_in_check(const vector<vector<string>>& board, const unordered_map<string, unique_ptr<Piece>>& pMap) {
+  bool is_in_check(const vector<vector<string>>& curr_board, const unordered_map<string, unique_ptr<Piece>>& curr_pMap) {
     string curr_king_id = (turn) ? "WK" : "BK";
-    vector<int> curr_king_position = pMap.at(curr_king_id)->getPosition();
+    vector<int> curr_king_position = curr_pMap.at(curr_king_id)->getPosition();
+    // get all the opposite player's moves
+    //TODO: This can't call get_all_moves instead there should be a get raw moves function
+    unordered_map<string, vector<vector<int>>> all_op_moves = get_all_possible_moves(!turn, curr_board, curr_pMap);
 
-    for (const auto& pPiece: pMap){
-      const unique_ptr<Piece>& curr_piece = pPiece.second;
-      if (curr_piece->getPlayer() == turn || !curr_piece->isAlive()){
-        continue;
-      }
-      vector<vector<int>> moves = curr_piece->getValidMoves(board, pMap);
-      for (const auto& move: moves){
+    for (const auto& pMoves: all_op_moves){
+      for (const auto& move: pMoves.second){
         if (move[0] == curr_king_position[0] && move[1] == curr_king_position[1]){
           return true;
         }
@@ -432,12 +426,104 @@ private:
 
   pair<string, vector<int>> get_user_input(){
     pair<string, vector<int>> user_move;
+    unordered_map<string, vector<vector<int>>> possible_moves = get_all_filtered_moves();
+    string id;
+    string move_idx;
+    int move_idx_int;
+    while(true){
+      cout << "What piece ID would you like to move? " << endl;
+      cin >> id;
+      if (possible_moves.find(id) == possible_moves.end()){
+        cout << "ID is not valid" << endl;
+        continue;
+      }
+
+      cout << "Here are the available moves for this piece: " << endl;
+      for (int i = 0; i < possible_moves.at(id).size(); i++){
+        cout << i+1 << ":< " << possible_moves.at(id)[i][0] << ", " << possible_moves.at(id)[i][1] << "> " << endl; 
+      }
+
+      cin >> move_idx;
+      try {
+        move_idx_int = std::stoi(move_idx);
+        if (move_idx_int >= possible_moves.at(id).size()){
+          cout << "Invalid move index" << endl;
+          continue;
+        }
+      } catch (const std::invalid_argument& e) {
+        std::cerr << "Invalid argument: " << e.what() << std::endl;
+        continue;
+      } catch (const std::out_of_range& e) {
+        std::cerr << "Out of range: " << e.what() << std::endl;
+        continue;
+      }
+      user_move = {id, possible_moves.at(id)[move_idx_int]};
+      break;
+
+    }
+
     return user_move;
   }
 
 
+  unordered_map<string, vector<vector<int>>> get_all_possible_moves(bool player,  const vector<vector<string>>& curr_board, const unordered_map<string, unique_ptr<Piece>>& curr_pMap){
+    unordered_map<string, vector<vector<int>>> all_moves;
+    for (const auto& pPiece: curr_pMap){
+      const unique_ptr<Piece>& curr_piece = pPiece.second;
+      if(curr_piece->getPlayer() != player || !curr_piece->isAlive()){
+        continue;
+      }
+      vector<vector<int>> curr_piece_moves = curr_piece->getValidMoves(curr_board, curr_pMap);
+
+      if (curr_piece_moves.size() != 0){
+
+        all_moves[curr_piece->getId()] = curr_piece_moves;
+      }
+    }
+    return all_moves;
+  }
+
+  // TODO: Need to add functionality for the case when the piece is moved
+  unordered_map<string, vector<vector<int>>> get_all_filtered_moves(){
+    auto possible_moves = get_all_possible_moves(turn, board, pMap);
+    unordered_map<string, vector<vector<int>>> all_valid_moves;
+    for (const auto& pMove: possible_moves){
+      string curr_piece_id = pMove.first;
+      for (const auto& move: pMove.second){
+        do_move(curr_piece_id, move[0], move[1]);
+        if (!is_in_check(board, pMap)){
+          all_valid_moves[curr_piece_id].push_back(move);
+        }
+        undo_move();
+      }
+    }
+
+    return all_valid_moves;
+  }
+
+
+  // Do a move and repeat the coordinates of the old position
+  void do_move(const string& id, int nx, int ny){
+    vector<int> curr_position = pMap[id]->getPosition();
+    pMap[id]->setPosition({nx, ny});
+    board[curr_position[0]][curr_position[1]] = "";
+    board[nx][ny] = id;
+    moveHistory.push({id, {curr_position[0], curr_position[1]}});
+  }
+
+  void undo_move(){
+    pair<string, vector<int>> last_move = moveHistory.top();
+    moveHistory.pop();
+    vector<int> curr_position = pMap[last_move.first]->getPosition();
+    pMap[last_move.first]->setPosition({last_move.second[0], last_move.second[1]});
+    board[curr_position[0]][curr_position[1]] = "";
+    board[last_move.second[0]][last_move.second[1]] = last_move.first;
+  }
 
 };
+
+
+
 
 
 int main() {
