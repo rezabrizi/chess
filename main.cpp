@@ -37,6 +37,15 @@ public:
     return vector<int>({x, y});
   }
 
+  void setPosition(vector<int> new_pos){
+    x = new_pos[0];
+    y = new_pos[1];
+  }
+
+  bool isAlive(){
+    return alive;
+  }
+
 
 
   virtual ~Piece() = default;
@@ -304,16 +313,20 @@ public:
     if (check){
       auto possible_moves = is_mate(board, pMap);
       if (possible_moves.size() == 0)
-        return (player) ? 1:0;
+        // if true then black won if false then white won
+        return (player) ? -1:1;
       else {
-        
+        string id = take_user_input_id_if_in_check(possible_moves);
+        int move_id = take_user_move_input(id, possible_moves[id]);
+        vector<int> curr_pos = pMap[id]->getPosition();
+        pMap[id]->setPosition(possible_moves[id][move_id]);
+        vector<int> new_pos = pMap[id]->getPosition();
+        board[curr_pos[0]][curr_pos[1]] = "";
+        board[new_pos[0]][curr_pod[1]] = id;
       }
+    }else {
+      
     }
-
-
-
-    
-
   }
 
 private:
@@ -392,17 +405,59 @@ private:
   unordered_map<string, vector<vector<int>>> is_mate(const vector<vector<string>>& board, const unordered_map<string, unique_ptr<Piece>>& pMap) {
     // Checkmate detection logic
     // Placeholder: Implement logic to check if the current player is in checkmate
-    return false;
+    unordered_map<string, vector<vector<int>>> possible_moves;
+    return possible_moves;
   }
 
-  id take_user_input(){
-    string id = cin >> "What piece would you like to move? " << endl;
-    if (pMap.find(id) == pMap.end() || pMap.at(id)->alive == false){
-      cout << "Invalid move" << endl;
-    } else {
-      // NEED TO GET THE valid moves and get the user input 
-      return id;
+  string take_user_input_id_if_in_check(const unordered_map<string, vector<vector<int>>>& possible_moves){
+    string id;
+    while (true){
+      cout << "What piece would you like to move? " << endl;
+      cin >> id;
+      if (possible_moves.find(id) == possible_moves.end()){
+        cout << "Invalid move" << endl;
+      } else {
+        break;
+      }
     }
+    return id;
+  }
+
+  int take_user_move_input(const string& id, const vector<vector<int>>& moves){
+    cout << "Possbile moves for piece " << id << " :" << endl;
+    for (int i = 0; i < moves.size(); i++){
+      cout << i+1 << " : <" << moves[i][0] << ", " << moves[i][1] << ">" << endl;
+    }
+
+
+    string move;
+    cin >> move;
+    return stoi(move)-1;
+  }
+
+  string take_user_id (){
+    string id;
+    vector<int> move(2);
+    while (true){
+      if (pMap.find(id) == pMap.end() || !pMap.at(id)->isAlive()){
+        cout << "invalid piece id." << endl;
+      }else {
+        vector<vector<int>> validMoves = pMap.at(id)->getValidMoves(board, pMap);
+        if (validMoves.size() == 0){
+          cout << "No valid moves for piece with id: " << id << endl;
+        }else {
+          for (int i = 0; i < validMoves.size(); i++){
+            cout << i + 1 << ": <" << validMoves[i][0] << "," << validMoves[i][1] << ">" << endl; 
+          }
+          string move_in;
+          cin >> move_in;
+          move[0] = validMoves[stoi(move_in)][0];
+          move[1] = validMoves[stoi(move_in)][1];
+        }
+      }
+    }
+    pair<string, vector<int>> user_move = {id, move};
+    return user_move;
   }
 };
 
